@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Profile } from '../data/profiles';
 import { trackEvent } from '../lib/analytics';
 
@@ -6,9 +7,12 @@ interface ShareCardProps {
   craft: number;
   organization: number;
   shareUrl: string;
+  reflection?: string | null;
 }
 
-export function ShareCard({ profile, craft, organization, shareUrl }: ShareCardProps) {
+export function ShareCard({ profile, craft, organization, shareUrl, reflection }: ShareCardProps) {
+  const [downloading, setDownloading] = useState(false);
+
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
   const whatsAppUrl = `https://wa.me/?text=${encodeURIComponent(
     `${profile.name} — Professional Identity Compass\n\nCraft: ${craft} | Organization: ${organization}\n\n${profile.shareSummary}\n\nTake the assessment: ${shareUrl}`,
@@ -30,28 +34,24 @@ export function ShareCard({ profile, craft, organization, shareUrl }: ShareCardP
     window.open(whatsAppUrl, '_blank');
   };
 
-  const downloadCard = () => {
-    trackEvent('result_shared', { method: 'download' });
-    const text = [
-      'PROFESSIONAL IDENTITY COMPASS',
-      '',
-      profile.name.toUpperCase(),
-      '',
-      `Craft Identity       ${craft}`,
-      `Organizational       ${organization}`,
-      '',
-      profile.shareSummary,
-      '',
-      `Take the assessment: ${shareUrl}`,
-    ].join('\n');
-
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'professional-identity-compass.txt';
-    a.click();
-    URL.revokeObjectURL(url);
+  const downloadCard = async () => {
+    setDownloading(true);
+    try {
+      trackEvent('result_shared', { method: 'download' });
+      const { generateResultPdf } = await import('../lib/generateResultPdf');
+      await generateResultPdf({
+        profile,
+        craft,
+        organization,
+        reflection,
+        shareUrl,
+      });
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      alert('Could not generate PDF. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -69,7 +69,9 @@ export function ShareCard({ profile, craft, organization, shareUrl }: ShareCardP
         <button className="np-btn-fill" onClick={copyLink}>Copy link</button>
         <button className="np-btn-ghost" onClick={shareLinkedIn}>LinkedIn</button>
         <button className="np-btn-ghost" onClick={shareWhatsApp}>WhatsApp</button>
-        <button className="np-btn-ghost" onClick={downloadCard}>Download card</button>
+        <button className="np-btn-ghost" onClick={downloadCard} disabled={downloading}>
+          {downloading ? 'Generating PDF…' : 'Download PDF'}
+        </button>
       </div>
     </div>
   );
