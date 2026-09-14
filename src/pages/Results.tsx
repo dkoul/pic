@@ -136,6 +136,7 @@ export function Results() {
         craft={result.craftScore}
         organization={result.organizationScore}
         shareUrl={shareUrl}
+        reflection={reflection}
       />
 
       <div className="np-btns" style={{ marginTop: 32 }}>
